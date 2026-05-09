@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Budget AI</title>
+  <!-- config.js must be loaded before app.js so CONFIG is available -->
+  <script src="config.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="layout">
+
+    <!-- ── Sidebar ─────────────────────────────────────────── -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <span class="app-name" id="appName">Budget AI</span>
+        <button class="icon-btn" id="newChatBtn" title="New chat" aria-label="New chat">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round"
+               stroke-linejoin="round" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
+      </div>
+
+      <nav class="history-list" id="historyList" aria-label="Chat history">
+        <p class="history-empty">No conversations yet.</p>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="icon-btn theme-toggle" id="themeToggle"
+                title="Toggle dark / light mode" aria-label="Toggle theme">
+          <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+          <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- ── Main chat area ──────────────────────────────────── -->
+    <main class="chat-main">
+
+      <!-- Mobile top bar -->
+      <header class="mobile-header">
+        <button class="icon-btn" id="sidebarToggle" aria-label="Open sidebar">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round"
+               stroke-linejoin="round" aria-hidden="true">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+        <span class="mobile-title" id="mobileTitle">Budget AI</span>
+      </header>
+
+      <!-- Message list -->
+      <section class="messages" id="messages" aria-live="polite" aria-label="Conversation">
+        <!-- Welcome screen shown when no messages exist -->
+        <div class="welcome" id="welcome">
+          <div class="welcome-icon" aria-hidden="true">💬</div>
+          <h1 class="welcome-heading" id="welcomeHeading">Welcome to Budget AI</h1>
+          <p class="welcome-sub">Ask me anything — I'll do my best to help.</p>
+        </div>
+      </section>
+
+      <!-- Error banner -->
+      <div class="error-banner" id="errorBanner" role="alert" aria-live="assertive" hidden>
+        <span id="errorText"></span>
+        <button class="icon-btn error-close" id="errorClose" aria-label="Dismiss error">✕</button>
+      </div>
+
+      <!-- Input bar -->
+      <form class="input-bar" id="inputForm" autocomplete="off">
+        <textarea
+          class="input-field"
+          id="userInput"
+          placeholder="Message Budget AI…"
+          rows="1"
+          aria-label="Message input"
+          maxlength="8000"
+        ></textarea>
+        <button type="submit" class="send-btn" id="sendBtn" aria-label="Send message">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round"
+               stroke-linejoin="round" aria-hidden="true">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </form>
+
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
