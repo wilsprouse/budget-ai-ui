@@ -228,7 +228,7 @@
           assistantTextNode.nodeValue = streamedText;
           statusText.textContent = 'Done';
         } catch {
-          assistantBubble.textContent = 'Error: Failed to connect to the configured endpoint.';
+          assistantBubble.textContent = 'Error: Failed to connect to the endpoint.';
           statusText.textContent = 'Connection error';
         } finally {
           sendButton.disabled = false;
