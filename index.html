@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Budget AI UI</title>
-    <script src="/config.js"></script>
+    <script src="./config.js"></script>
     <style>
       :root {
         color-scheme: light;
@@ -185,10 +185,13 @@
         assistantBubble.appendChild(assistantTextNode);
 
         try {
-          const response = await fetch('/api/chat', {
+          const response = await fetch(endpoint, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message, endpoint })
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'text/event-stream, application/json, text/plain'
+            },
+            body: JSON.stringify({ message, stream: true })
           });
 
           if (!response.ok) {
@@ -208,13 +211,10 @@
           const decoder = new TextDecoder();
           let streamedText = '';
 
-          let done = false;
-          while (!done) {
-            const chunk = await reader.read();
-            done = chunk.done;
-            const value = chunk.value;
+          while (true) {
+            const { done, value } = await reader.read();
             if (done) {
-              continue;
+              break;
             }
             streamedText += decoder.decode(value, { stream: true });
             assistantTextNode.nodeValue = streamedText;
@@ -225,7 +225,7 @@
           assistantTextNode.nodeValue = streamedText;
           statusText.textContent = 'Done';
         } catch {
-          assistantBubble.textContent = 'Error: Failed to connect to the chat proxy.';
+          assistantBubble.textContent = 'Error: Failed to connect to the configured endpoint.';
           statusText.textContent = 'Connection error';
         } finally {
           sendButton.disabled = false;

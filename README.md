@@ -1,20 +1,11 @@
 # budget-ai-ui
 
-A lightweight, framework-free chatbot UI (plain HTML/CSS/vanilla JS) that can stream responses from a hosted LLM endpoint.
+A lightweight, framework-free chatbot UI (plain HTML/CSS/vanilla JS).
 
-## Run locally
+## Usage (no Node required)
 
-1. (Optional) Copy `.env.example` to `.env`.
-2. Set `LLM_ENDPOINT` (and optionally `PORT`) in `.env` or as system environment variables.
-3. Start the server:
+1. Set your default endpoint in `config.js` (`llmEndpoint`) or leave it blank and type the endpoint in the UI.
+2. Open `/home/runner/work/budget-ai-ui/budget-ai-ui/index.html` directly in your browser.
+3. Send a message to stream responses from your configured LLM endpoint.
 
-```bash
-npm start
-```
-
-Then open `http://localhost:3000`.
-
-## Environment variables
-
-- `LLM_ENDPOINT`: Default LLM endpoint used by the frontend.
-- `PORT`: Local server port (default: `3000`).
+> Note: Your hosted LLM endpoint must allow cross-origin browser requests (CORS) for direct browser access.
