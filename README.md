@@ -11,3 +11,4 @@ A lightweight, framework-free chatbot UI (plain HTML/CSS/vanilla JS).
 ## Requirements
 
 Your hosted LLM endpoint must allow cross-origin browser requests (CORS) for direct browser access.
+At minimum, configure CORS headers like `Access-Control-Allow-Origin`, `Access-Control-Allow-Methods`, and `Access-Control-Allow-Headers` to permit browser `POST` requests with JSON.
