@@ -8,6 +8,12 @@
 (function () {
   'use strict';
 
+  // ── Constants ─────────────────────────────────────────────
+  // Fallback max height (px) for the textarea — mirrors --input-max-h in styles.css
+  const INPUT_MAX_HEIGHT_FALLBACK = 200;
+  // Max characters used when auto-generating a conversation title from user input
+  const MAX_TITLE_LENGTH = 50;
+
   // ── Validate CONFIG ──────────────────────────────────────
   if (typeof CONFIG === 'undefined') {
     console.error('[Budget AI] config.js was not loaded. The app cannot start.');
@@ -286,7 +292,7 @@
   function autoResize() {
     userInput.style.height = 'auto';
     const maxH = parseInt(getComputedStyle(document.documentElement)
-      .getPropertyValue('--input-max-h'), 10) || 200;
+      .getPropertyValue('--input-max-h'), 10) || INPUT_MAX_HEIGHT_FALLBACK;
     userInput.style.height = Math.min(userInput.scrollHeight, maxH) + 'px';
   }
 
@@ -316,7 +322,7 @@
     if (!currentId) {
       const convo = {
         id: 'c_' + Date.now(),
-        title: text.slice(0, 50),
+        title: text.slice(0, MAX_TITLE_LENGTH),
         messages: [],
       };
       if (CONFIG.SYSTEM_PROMPT) {
@@ -353,7 +359,7 @@
       convo.messages.push({ role: 'assistant', content: fullResponse });
       // Update title if it was just the first user turn
       if (convo.messages.filter(m => m.role === 'user').length === 1) {
-        convo.title = text.slice(0, 50);
+        convo.title = text.slice(0, MAX_TITLE_LENGTH);
       }
       saveConversations();
       renderHistory();
