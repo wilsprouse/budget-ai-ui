@@ -91,12 +91,17 @@ async function handleChatRequest(req, res) {
   let rawBody = '';
   req.setEncoding('utf8');
 
-  for await (const chunk of req) {
-    rawBody += chunk;
-    if (rawBody.length > MAX_REQUEST_BODY_SIZE) {
-      sendJson(res, 413, { error: 'Request body too large' });
-      return;
+  try {
+    for await (const chunk of req) {
+      rawBody += chunk;
+      if (rawBody.length > MAX_REQUEST_BODY_SIZE) {
+        sendJson(res, 413, { error: 'Request body too large' });
+        return;
+      }
     }
+  } catch {
+    sendJson(res, 400, { error: 'Failed to read request body' });
+    return;
   }
 
   let payload;
