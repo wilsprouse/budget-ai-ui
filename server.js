@@ -197,6 +197,8 @@ const server = http.createServer((req, res) => {
   sendJson(res, 405, { error: 'Method not allowed' });
 });
 
-server.listen(port, () => {
-  console.log(`Budget AI UI available at http://localhost:${port}`);
+server.listen(port, '0.0.0.0', () => {
+  const address = server.address();
+  const resolvedPort = address && typeof address === 'object' ? address.port : port;
+  console.log(`Budget AI UI available at http://localhost:${resolvedPort}`);
 });
