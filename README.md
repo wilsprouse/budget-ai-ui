@@ -8,6 +8,6 @@ A lightweight, framework-free chatbot UI (plain HTML/CSS/vanilla JS).
 2. Open `index.html` directly in your browser.
 3. Send a message to stream responses from your configured LLM endpoint.
 
-## Requirement
+## Requirements
 
 Your hosted LLM endpoint must allow cross-origin browser requests (CORS) for direct browser access.
