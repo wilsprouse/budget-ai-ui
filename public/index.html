@@ -147,6 +147,9 @@
       const chatContainer = document.getElementById('chat');
 
       endpointInput.value = window.APP_CONFIG?.llmEndpoint || '';
+      if (!window.APP_CONFIG) {
+        console.warn('APP_CONFIG is not available. Falling back to manual endpoint entry.');
+      }
 
       function addMessage(role, text) {
         const element = document.createElement('article');
@@ -177,6 +180,9 @@
 
         addMessage('user', message);
         const assistantBubble = addMessage('assistant', '');
+        const assistantTextNode = document.createTextNode('');
+        assistantBubble.textContent = '';
+        assistantBubble.appendChild(assistantTextNode);
 
         try {
           const response = await fetch('/api/chat', {
@@ -200,6 +206,7 @@
 
           const reader = response.body.getReader();
           const decoder = new TextDecoder();
+          let streamedText = '';
 
           while (true) {
             const { done, value } = await reader.read();
@@ -207,11 +214,13 @@
               break;
             }
 
-            assistantBubble.textContent += decoder.decode(value, { stream: true });
+            streamedText += decoder.decode(value, { stream: true });
+            assistantTextNode.nodeValue = streamedText;
             chatContainer.scrollTop = chatContainer.scrollHeight;
           }
 
-          assistantBubble.textContent += decoder.decode();
+          streamedText += decoder.decode();
+          assistantTextNode.nodeValue = streamedText;
           statusText.textContent = 'Done';
         } catch {
           assistantBubble.textContent = 'Error: Failed to connect to the chat proxy.';

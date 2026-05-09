@@ -50,10 +50,11 @@ function sendJson(res, statusCode, payload) {
 }
 
 function serveStaticFile(reqPath, res) {
-  const normalizedPath = reqPath === '/' ? '/index.html' : reqPath;
-  const filePath = path.join(publicDir, path.normalize(normalizedPath));
+  const normalizedPath = reqPath === '/' ? 'index.html' : reqPath.replace(/^\/+/, '');
+  const filePath = path.resolve(publicDir, normalizedPath);
+  const relativePath = path.relative(publicDir, filePath);
 
-  if (!filePath.startsWith(publicDir)) {
+  if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
     sendJson(res, 403, { error: 'Forbidden' });
     return;
   }
@@ -70,7 +71,12 @@ function serveStaticFile(reqPath, res) {
     }
 
     const extension = path.extname(filePath);
-    const contentType = extension === '.html' ? 'text/html; charset=utf-8' : 'text/plain; charset=utf-8';
+    const contentTypeByExtension = {
+      '.html': 'text/html; charset=utf-8',
+      '.css': 'text/css; charset=utf-8',
+      '.js': 'application/javascript; charset=utf-8'
+    };
+    const contentType = contentTypeByExtension[extension] || 'text/plain; charset=utf-8';
 
     res.writeHead(200, {
       'Content-Type': contentType,
@@ -107,11 +113,11 @@ async function handleChatRequest(req, res) {
   }
 
   const abortController = new AbortController();
-  req.on('close', () => abortController.abort());
+  const closeHandler = () => abortController.abort();
+  req.on('close', closeHandler);
 
-  let upstream;
   try {
-    upstream = await fetch(targetEndpoint, {
+    const upstream = await fetch(targetEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -123,28 +129,32 @@ async function handleChatRequest(req, res) {
       }),
       signal: abortController.signal
     });
+    const upstreamType = upstream.headers.get('content-type') || 'text/plain; charset=utf-8';
+
+    res.writeHead(upstream.status, {
+      'Content-Type': upstreamType,
+      'Cache-Control': 'no-store'
+    });
+
+    if (!upstream.body) {
+      const text = await upstream.text();
+      res.end(text);
+      return;
+    }
+
+    for await (const chunk of upstream.body) {
+      res.write(chunk);
+    }
+    res.end();
   } catch {
-    sendJson(res, 502, { error: 'Failed to reach configured LLM endpoint' });
-    return;
+    if (!res.headersSent) {
+      sendJson(res, 502, { error: 'Failed to reach configured LLM endpoint' });
+    } else {
+      res.end();
+    }
+  } finally {
+    req.off('close', closeHandler);
   }
-
-  const upstreamType = upstream.headers.get('content-type') || 'text/plain; charset=utf-8';
-
-  res.writeHead(upstream.status, {
-    'Content-Type': upstreamType,
-    'Cache-Control': 'no-store'
-  });
-
-  if (!upstream.body) {
-    const text = await upstream.text();
-    res.end(text);
-    return;
-  }
-
-  for await (const chunk of upstream.body) {
-    res.write(chunk);
-  }
-  res.end();
 }
 
 const server = http.createServer((req, res) => {
