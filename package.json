@@ -1,0 +1,10 @@
+{
+  "name": "budget-ai-ui",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Plain HTML/CSS chat UI for querying a hosted LLM endpoint",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  }
+}

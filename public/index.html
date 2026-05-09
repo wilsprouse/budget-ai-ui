@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Budget AI UI</title>
+    <script src="/config.js"></script>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        --border: #d9d9de;
+        --primary: #0b57d0;
+      }
+
+      body {
+        margin: 0;
+        background: #f7f8fa;
+      }
+
+      .app {
+        max-width: 900px;
+        height: 100vh;
+        margin: 0 auto;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        gap: 12px;
+        padding: 16px;
+        box-sizing: border-box;
+      }
+
+      .panel {
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      .endpoint {
+        padding: 12px;
+        display: grid;
+        gap: 8px;
+      }
+
+      .chat {
+        overflow-y: auto;
+        padding: 12px;
+        display: grid;
+        gap: 10px;
+        align-content: start;
+      }
+
+      .message {
+        max-width: 85%;
+        padding: 10px 12px;
+        border-radius: 8px;
+        white-space: pre-wrap;
+        line-height: 1.4;
+      }
+
+      .message.user {
+        justify-self: end;
+        background: #e9f2ff;
+        border: 1px solid #cddfff;
+      }
+
+      .message.assistant {
+        justify-self: start;
+        background: #fff;
+        border: 1px solid var(--border);
+      }
+
+      .composer {
+        padding: 12px;
+        display: grid;
+        gap: 8px;
+      }
+
+      .row {
+        display: flex;
+        gap: 8px;
+      }
+
+      input,
+      textarea,
+      button {
+        font: inherit;
+      }
+
+      input,
+      textarea {
+        width: 100%;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 10px;
+        box-sizing: border-box;
+      }
+
+      textarea {
+        min-height: 96px;
+        resize: vertical;
+      }
+
+      button {
+        border: 0;
+        border-radius: 6px;
+        background: var(--primary);
+        color: white;
+        padding: 10px 16px;
+        cursor: pointer;
+      }
+
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .status {
+        color: #555;
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <section class="panel endpoint">
+        <label for="endpoint">LLM endpoint URL or IP</label>
+        <input id="endpoint" placeholder="http://127.0.0.1:8000/chat" />
+      </section>
+
+      <section id="chat" class="panel chat" aria-live="polite"></section>
+
+      <section class="panel composer">
+        <label for="prompt">Message</label>
+        <textarea id="prompt" placeholder="Ask the model something..."></textarea>
+        <div class="row">
+          <button id="send">Send</button>
+          <span id="status" class="status">Idle</span>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const endpointInput = document.getElementById('endpoint');
+      const promptInput = document.getElementById('prompt');
+      const sendButton = document.getElementById('send');
+      const statusText = document.getElementById('status');
+      const chatContainer = document.getElementById('chat');
+
+      endpointInput.value = window.APP_CONFIG?.llmEndpoint || '';
+
+      function addMessage(role, text) {
+        const element = document.createElement('article');
+        element.className = `message ${role}`;
+        element.textContent = text;
+        chatContainer.appendChild(element);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+        return element;
+      }
+
+      async function sendMessage() {
+        const message = promptInput.value.trim();
+        const endpoint = endpointInput.value.trim();
+
+        if (!message) {
+          statusText.textContent = 'Type a message first.';
+          return;
+        }
+
+        if (!endpoint) {
+          statusText.textContent = 'Set an endpoint URL first.';
+          return;
+        }
+
+        promptInput.value = '';
+        sendButton.disabled = true;
+        statusText.textContent = 'Streaming response...';
+
+        addMessage('user', message);
+        const assistantBubble = addMessage('assistant', '');
+
+        try {
+          const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message, endpoint })
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            assistantBubble.textContent = `Error: ${errorText || response.statusText}`;
+            statusText.textContent = 'Request failed';
+            return;
+          }
+
+          if (!response.body) {
+            assistantBubble.textContent = await response.text();
+            statusText.textContent = 'Done';
+            return;
+          }
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              break;
+            }
+
+            assistantBubble.textContent += decoder.decode(value, { stream: true });
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+          }
+
+          assistantBubble.textContent += decoder.decode();
+          statusText.textContent = 'Done';
+        } catch {
+          assistantBubble.textContent = 'Error: Failed to connect to the chat proxy.';
+          statusText.textContent = 'Connection error';
+        } finally {
+          sendButton.disabled = false;
+        }
+      }
+
+      sendButton.addEventListener('click', sendMessage);
+      promptInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+          sendMessage();
+        }
+      });
+    </script>
+  </body>
+</html>
