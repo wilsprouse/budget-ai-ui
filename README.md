@@ -4,8 +4,8 @@ A lightweight, framework-free chatbot UI (plain HTML/CSS/vanilla JS) that can st
 
 ## Run locally
 
-1. Copy `.env.example` to `.env`.
-2. Set `LLM_ENDPOINT` to your hosted LLM URL/IP.
+1. (Optional) Copy `.env.example` to `.env`.
+2. Set `LLM_ENDPOINT` (and optionally `PORT`) in `.env` or as system environment variables.
 3. Start the server:
 
 ```bash

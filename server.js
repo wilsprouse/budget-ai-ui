@@ -39,6 +39,7 @@ function loadEnvFile() {
 const envFromFile = loadEnvFile();
 const llmEndpoint = process.env.LLM_ENDPOINT || envFromFile.LLM_ENDPOINT || '';
 const port = Number.parseInt(process.env.PORT || envFromFile.PORT || '3000', 10);
+const MAX_REQUEST_BODY_SIZE = 1024 * 1024;
 
 function sendJson(res, statusCode, payload) {
   const body = JSON.stringify(payload);
@@ -92,7 +93,7 @@ async function handleChatRequest(req, res) {
 
   for await (const chunk of req) {
     rawBody += chunk;
-    if (rawBody.length > 1024 * 1024) {
+    if (rawBody.length > MAX_REQUEST_BODY_SIZE) {
       sendJson(res, 413, { error: 'Request body too large' });
       return;
     }
@@ -146,9 +147,10 @@ async function handleChatRequest(req, res) {
       res.write(chunk);
     }
     res.end();
-  } catch {
+  } catch (error) {
     if (!res.headersSent) {
-      sendJson(res, 502, { error: 'Failed to reach configured LLM endpoint' });
+      const detail = error && typeof error.message === 'string' ? error.message : 'Unknown upstream error';
+      sendJson(res, 502, { error: `Failed to reach configured LLM endpoint: ${detail}` });
     } else {
       res.end();
     }
