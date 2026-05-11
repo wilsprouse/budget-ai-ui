@@ -390,14 +390,29 @@
       headers['Authorization'] = `Bearer ${CONFIG.API_KEY}`;
     }
 
+    // Build the request body according to the configured format.
+    const useSimpleFormat = (CONFIG.REQUEST_FORMAT || 'openai') === 'simple';
+    let requestBody;
+    if (useSimpleFormat) {
+      // Simple format: { prompt, stream }
+      // Extract the last user message as the prompt, prepending the system
+      // prompt (if any) so the server still benefits from the instruction.
+      const systemMsg = messages.find(m => m.role === 'system');
+      const lastUser  = messages.findLast(m => m.role === 'user');
+      const userText  = lastUser ? lastUser.content : '';
+      const promptText = systemMsg
+        ? `${systemMsg.content}\n\n${userText}`
+        : userText;
+      requestBody = { prompt: promptText, stream: true };
+    } else {
+      // OpenAI-compatible format: { model, messages, stream }
+      requestBody = { model: CONFIG.MODEL, messages, stream: true };
+    }
+
     const response = await fetch(endpoint, {
       method: 'POST',
       headers,
-      body: JSON.stringify({
-        model: CONFIG.MODEL,
-        messages,
-        stream: true,
-      }),
+      body: JSON.stringify(requestBody),
       signal: abortController.signal,
     });
 
@@ -418,38 +433,53 @@
 
       buffer += decoder.decode(value, { stream: true });
 
-      // SSE format: lines starting with "data: "
-      const lines = buffer.split('\n');
-      // Keep the last (possibly incomplete) line in the buffer
-      buffer = lines.pop();
+      if (useSimpleFormat) {
+        // Simple servers stream raw text chunks (no SSE envelope).
+        // The TextDecoder's {stream:true} flag retains its own internal state
+        // for incomplete multi-byte UTF-8 sequences across decode() calls, so
+        // flushing `buffer` here is safe — all returned chars are complete.
+        if (firstToken && buffer.length > 0) {
+          bubble.innerHTML = '';
+          firstToken = false;
+        }
+        fullText += buffer;
+        buffer = '';
+        bubble.textContent = fullText;
+        scrollToBottom();
+      } else {
+        // SSE format: lines starting with "data: "
+        const lines = buffer.split('\n');
+        // Keep the last (possibly incomplete) line in the buffer
+        buffer = lines.pop();
 
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed === 'data: [DONE]') continue;
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed === 'data: [DONE]') continue;
 
-        if (trimmed.startsWith('data: ')) {
-          const jsonStr = trimmed.slice(6);
-          let parsed;
-          try {
-            parsed = JSON.parse(jsonStr);
-          } catch {
-            continue;
+          if (trimmed.startsWith('data: ')) {
+            const jsonStr = trimmed.slice(6);
+            let parsed;
+            try {
+              parsed = JSON.parse(jsonStr);
+            } catch {
+              continue;
+            }
+
+            // OpenAI-compatible delta content
+            const delta = parsed?.choices?.[0]?.delta?.content;
+            if (delta == null) continue;
+
+            if (firstToken) {
+              // Replace typing indicator with actual text
+              bubble.innerHTML = '';
+              firstToken = false;
+            }
+
+            fullText += delta;
+            // Stream content as plain text; apply formatting on completion
+            bubble.textContent = fullText;
+            scrollToBottom();
           }
-
-          // OpenAI-compatible delta content
-          const delta = parsed?.choices?.[0]?.delta?.content;
-          if (delta == null) continue;
-
-          if (firstToken) {
-            // Replace typing indicator with actual text
-            bubble.innerHTML = '';
-            firstToken = false;
-          }
-
-          fullText += delta;
-          // Stream content as plain text; apply formatting on completion
-          bubble.textContent = fullText;
-          scrollToBottom();
         }
       }
     }

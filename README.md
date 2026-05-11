@@ -13,12 +13,13 @@ Open **`config.js`** and set the values for your LLM server:
 
 ```js
 const CONFIG = {
-  LLM_BASE_URL: 'http://localhost:11434',  // base URL of your LLM server
-  LLM_API_PATH: '/v1/chat/completions',    // OpenAI-compatible path
-  MODEL:        'llama3.2',               // model name
-  API_KEY:      '',                        // leave empty if not required
-  SYSTEM_PROMPT:'You are a helpful and friendly AI assistant.',
-  APP_NAME:     'Budget AI',
+  LLM_BASE_URL:   'http://localhost:11434',       // base URL of your LLM server
+  LLM_API_PATH:   '/v1/chat/completions',         // API path (see table below)
+  REQUEST_FORMAT: 'openai',                       // 'openai' or 'simple'
+  MODEL:          'llama3.2',                     // model name (openai format only)
+  API_KEY:        '',                             // leave empty if not required
+  SYSTEM_PROMPT:  'You are a helpful and friendly AI assistant.',
+  APP_NAME:       'Budget AI',
 };
 ```
 
@@ -27,13 +28,21 @@ before opening the app.
 
 #### Compatible LLM servers
 
-| Server | LLM_BASE_URL example | LLM_API_PATH |
-|---|---|---|
-| [Ollama](https://ollama.com) | `http://localhost:11434` | `/v1/chat/completions` |
-| [LM Studio](https://lmstudio.ai) | `http://localhost:1234` | `/v1/chat/completions` |
-| [llama.cpp](https://github.com/ggerganov/llama.cpp) | `http://localhost:8080` | `/v1/chat/completions` |
-| OpenAI | `https://api.openai.com` | `/v1/chat/completions` |
-| [vLLM](https://github.com/vllm-project/vllm) | `http://localhost:8000` | `/v1/chat/completions` |
+| Server | LLM_BASE_URL example | LLM_API_PATH | REQUEST_FORMAT |
+|---|---|---|---|
+| [Ollama](https://ollama.com) | `http://localhost:11434` | `/v1/chat/completions` | `'openai'` |
+| [LM Studio](https://lmstudio.ai) | `http://localhost:1234` | `/v1/chat/completions` | `'openai'` |
+| [llama.cpp](https://github.com/ggerganov/llama.cpp) | `http://localhost:8080` | `/v1/chat/completions` | `'openai'` |
+| OpenAI | `https://api.openai.com` | `/v1/chat/completions` | `'openai'` |
+| [vLLM](https://github.com/vllm-project/vllm) | `http://localhost:8000` | `/v1/chat/completions` | `'openai'` |
+| Custom prompt API | `http://<ip>:8000` | `/generate` | `'simple'` |
+
+**`REQUEST_FORMAT: 'simple'`** — use this when your server expects a plain
+`{"prompt": "…", "stream": true}` body (e.g. a custom `/generate` endpoint).
+The response is treated as a stream of raw text chunks.
+
+**`REQUEST_FORMAT: 'openai'`** (default) — sends the full
+`{"model", "messages", "stream"}` body understood by OpenAI-compatible servers.
 
 > **CORS note:** if the browser blocks cross-origin requests to your LLM
 > server, start the server with CORS enabled or serve both files from the same
