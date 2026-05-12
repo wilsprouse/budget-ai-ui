@@ -383,23 +383,39 @@
   async function streamResponse(messages, bubble) {
     abortController = new AbortController();
 
-    const endpoint = `${(CONFIG.LLM_BASE_URL || '').replace(/\/$/, '')}${CONFIG.LLM_API_PATH || '/v1/chat/completions'}`;
+    //const endpoint = `${(CONFIG.LLM_BASE_URL || '').replace(/\/$/, '')}${CONFIG.LLM_API_PATH || '/generate'}`;
+    const endpoint = `${CONFIG.LLM_BASE_URL}/generate`;
 
     const headers = { 'Content-Type': 'application/json' };
     if (CONFIG.API_KEY) {
       headers['Authorization'] = `Bearer ${CONFIG.API_KEY}`;
     }
 
+    const prompt = messages
+      .map(m => `${m.role}: ${m.content}`)
+      .join('\n');
+
     const response = await fetch(endpoint, {
       method: 'POST',
       headers,
       body: JSON.stringify({
         model: CONFIG.MODEL,
-        messages,
+        prompt,
         stream: true,
       }),
       signal: abortController.signal,
     });
+
+    /*const response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        prompt: messages[messages.length - 1].content,
+        stream: true
+      }),
+      signal: abortController.signal,
+    });*/
+
 
     if (!response.ok) {
       const body = await response.text().catch(() => '');
@@ -414,43 +430,42 @@
 
     while (true) {
       const { done, value } = await reader.read();
+
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
 
-      // SSE format: lines starting with "data: "
       const lines = buffer.split('\n');
-      // Keep the last (possibly incomplete) line in the buffer
+
       buffer = lines.pop();
 
       for (const line of lines) {
         const trimmed = line.trim();
-        if (!trimmed || trimmed === 'data: [DONE]') continue;
 
-        if (trimmed.startsWith('data: ')) {
-          const jsonStr = trimmed.slice(6);
-          let parsed;
-          try {
-            parsed = JSON.parse(jsonStr);
-          } catch {
-            continue;
-          }
+        if (!trimmed) continue;
 
-          // OpenAI-compatible delta content
-          const delta = parsed?.choices?.[0]?.delta?.content;
-          if (delta == null) continue;
+        let parsed;
 
-          if (firstToken) {
-            // Replace typing indicator with actual text
-            bubble.innerHTML = '';
-            firstToken = false;
-          }
-
-          fullText += delta;
-          // Stream content as plain text; apply formatting on completion
-          bubble.textContent = fullText;
-          scrollToBottom();
+        try {
+          parsed = JSON.parse(trimmed);
+        } catch {
+          continue;
         }
+
+        const delta = parsed?.response;
+
+        if (!delta) continue;
+
+        if (firstToken) {
+          bubble.innerHTML = '';
+          firstToken = false;
+        }
+
+        fullText += delta;
+
+        bubble.textContent = fullText;
+
+        scrollToBottom();
       }
     }
 
