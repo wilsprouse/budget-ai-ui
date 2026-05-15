@@ -490,11 +490,12 @@
     let buffer = '';
     let fullText = '';
     let firstToken = true;
+    let streamComplete = false;
 
     while (true) {
       const { done, value } = await reader.read();
 
-      if (done) break;
+      if (done || streamComplete) break;
 
       buffer += decoder.decode(value, { stream: true });
 
@@ -539,6 +540,7 @@
 
         // Check if streaming is complete
         if (parsed?.stop === true) {
+          streamComplete = true;
           break;
         }
       }
