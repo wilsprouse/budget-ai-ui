@@ -15,6 +15,9 @@
   const MAX_TITLE_LENGTH = 50;
   // Default system prompt fallback
   const DEFAULT_SYSTEM_PROMPT = 'You are a helpful assistant';
+  // Chat template tokens
+  const CHAT_START_TOKEN = '<|im_start|>';
+  const CHAT_END_TOKEN = '<|im_end|>';
 
   // ── Validate CONFIG ──────────────────────────────────────
   if (typeof CONFIG === 'undefined') {
@@ -102,7 +105,7 @@
   // Update CONFIG when settings change
   if (systemPromptInput) {
     systemPromptInput.addEventListener('input', () => {
-      CONFIG.SYSTEM_PROMPT = systemPromptInput.value || DEFAULT_SYSTEM_PROMPT;
+      CONFIG.SYSTEM_PROMPT = systemPromptInput.value;
     });
   }
 
@@ -452,8 +455,8 @@
 
     // Format prompt with chat template tokens
     const prompt = messages
-      .map(m => `<|im_start|>${m.role}\n${m.content}\n<|im_end|>`)
-      .join('\n') + '\n<|im_start|>assistant\n';
+      .map(m => `${CHAT_START_TOKEN}${m.role}\n${m.content}\n${CHAT_END_TOKEN}`)
+      .join('\n') + `\n${CHAT_START_TOKEN}assistant\n`;
 
     const response = await fetch(endpoint, {
       method: 'POST',
