@@ -13,6 +13,8 @@
   const INPUT_MAX_HEIGHT_FALLBACK = 200;
   // Max characters used when auto-generating a conversation title from user input
   const MAX_TITLE_LENGTH = 50;
+  // Default system prompt fallback
+  const DEFAULT_SYSTEM_PROMPT = 'You are a helpful assistant';
 
   // ── Validate CONFIG ──────────────────────────────────────
   if (typeof CONFIG === 'undefined') {
@@ -74,7 +76,7 @@
   // Initialize settings from CONFIG
   if (systemPromptInput) {
     systemPromptInput.value = CONFIG.SYSTEM_PROMPT || '';
-    systemPromptInput.placeholder = CONFIG.SYSTEM_PROMPT || 'You are a helpful assistant';
+    systemPromptInput.placeholder = CONFIG.SYSTEM_PROMPT || DEFAULT_SYSTEM_PROMPT;
   }
   if (maxTokensInput) {
     maxTokensInput.value = CONFIG.MAX_TOKENS || 512;
@@ -100,7 +102,7 @@
   // Update CONFIG when settings change
   if (systemPromptInput) {
     systemPromptInput.addEventListener('input', () => {
-      CONFIG.SYSTEM_PROMPT = systemPromptInput.value || 'You are a helpful assistant';
+      CONFIG.SYSTEM_PROMPT = systemPromptInput.value || DEFAULT_SYSTEM_PROMPT;
     });
   }
 
