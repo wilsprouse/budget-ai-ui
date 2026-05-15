@@ -490,6 +490,7 @@
     let buffer = '';
     let fullText = '';
     let firstToken = true;
+    // Flag to exit both loops when backend signals completion via stop field
     let streamComplete = false;
 
     while (true) {
@@ -538,7 +539,8 @@
 
         scrollToBottom();
 
-        // Check if streaming is complete
+        // Check if streaming is complete - need to exit both loops
+        // (inner loop processes lines, outer loop reads chunks)
         if (parsed?.stop === true) {
           streamComplete = true;
           break;
