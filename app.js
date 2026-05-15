@@ -507,15 +507,22 @@
 
         if (!trimmed) continue;
 
+        // Handle Server-Sent Events format (lines starting with "data: ")
+        let jsonStr = trimmed;
+        if (trimmed.startsWith('data: ')) {
+          jsonStr = trimmed.substring(6);
+        }
+
         let parsed;
 
         try {
-          parsed = JSON.parse(trimmed);
+          parsed = JSON.parse(jsonStr);
         } catch {
           continue;
         }
 
-        const delta = parsed?.response;
+        // Extract content from the new streaming format
+        const delta = parsed?.content;
 
         if (!delta) continue;
 
@@ -529,6 +536,11 @@
         bubble.textContent = fullText;
 
         scrollToBottom();
+
+        // Check if streaming is complete
+        if (parsed?.stop === true) {
+          break;
+        }
       }
     }
 
