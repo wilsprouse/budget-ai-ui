@@ -28,7 +28,14 @@ const CONFIG = {
   API_KEY: '',
 
   // System prompt sent with every conversation.
-  SYSTEM_PROMPT: 'You are a helpful and friendly AI assistant.',
+  SYSTEM_PROMPT: 'You are a helpful assistant',
+
+  // Maximum number of tokens to generate in the response.
+  MAX_TOKENS: 512,
+
+  // Temperature for response generation (0.0 to 2.0).
+  // Lower values make output more deterministic.
+  TEMPERATURE: 0.7,
 
   // Name displayed in the browser tab and chat header.
   APP_NAME: 'Budget AI',

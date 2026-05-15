@@ -41,6 +41,13 @@
   const appNameEl    = document.getElementById('appName');
   const mobileTitleEl= document.getElementById('mobileTitle');
   const welcomeHeadingEl = document.getElementById('welcomeHeading');
+  const settingsToggle = document.getElementById('settingsToggle');
+  const settingsPanel = document.getElementById('settingsPanel');
+  const systemPromptInput = document.getElementById('systemPrompt');
+  const maxTokensInput = document.getElementById('maxTokens');
+  const maxTokensValue = document.getElementById('maxTokensValue');
+  const temperatureInput = document.getElementById('temperature');
+  const temperatureValue = document.getElementById('temperatureValue');
 
   // ── Apply app name from config ────────────────────────────
   const appName = (CONFIG.APP_NAME || 'Budget AI').trim();
@@ -62,6 +69,56 @@
     const current = document.documentElement.getAttribute('data-theme') || 'light';
     applyTheme(current === 'dark' ? 'light' : 'dark');
   });
+
+  // ── Settings panel ────────────────────────────────────────
+  // Initialize settings from CONFIG
+  if (systemPromptInput) {
+    systemPromptInput.value = CONFIG.SYSTEM_PROMPT || '';
+    systemPromptInput.placeholder = CONFIG.SYSTEM_PROMPT || 'You are a helpful assistant';
+  }
+  if (maxTokensInput) {
+    maxTokensInput.value = CONFIG.MAX_TOKENS || 512;
+    maxTokensValue.textContent = CONFIG.MAX_TOKENS || 512;
+  }
+  if (temperatureInput) {
+    temperatureInput.value = CONFIG.TEMPERATURE || 0.7;
+    temperatureValue.textContent = CONFIG.TEMPERATURE || 0.7;
+  }
+
+  // Settings toggle
+  if (settingsToggle) {
+    settingsToggle.addEventListener('click', () => {
+      const isHidden = settingsPanel.hasAttribute('hidden');
+      if (isHidden) {
+        settingsPanel.removeAttribute('hidden');
+      } else {
+        settingsPanel.setAttribute('hidden', '');
+      }
+    });
+  }
+
+  // Update CONFIG when settings change
+  if (systemPromptInput) {
+    systemPromptInput.addEventListener('input', () => {
+      CONFIG.SYSTEM_PROMPT = systemPromptInput.value || 'You are a helpful assistant';
+    });
+  }
+
+  if (maxTokensInput) {
+    maxTokensInput.addEventListener('input', () => {
+      const value = parseInt(maxTokensInput.value);
+      maxTokensValue.textContent = value;
+      CONFIG.MAX_TOKENS = value;
+    });
+  }
+
+  if (temperatureInput) {
+    temperatureInput.addEventListener('input', () => {
+      const value = parseFloat(temperatureInput.value);
+      temperatureValue.textContent = value.toFixed(1);
+      CONFIG.TEMPERATURE = value;
+    });
+  }
 
   // ── Sidebar toggle (mobile) ───────────────────────────────
   if (sidebarToggle) {
@@ -391,17 +448,18 @@
       headers['Authorization'] = `Bearer ${CONFIG.API_KEY}`;
     }
 
+    // Format prompt with chat template tokens
     const prompt = messages
-      .map(m => `${m.role}: ${m.content}`)
-      .join('\n');
+      .map(m => `<|im_start|>${m.role}\n${m.content}\n<|im_end|>`)
+      .join('\n') + '\n<|im_start|>assistant\n';
 
     const response = await fetch(endpoint, {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        model: CONFIG.MODEL,
         prompt,
-        stream: true,
+        max_tokens: CONFIG.MAX_TOKENS || 512,
+        temperature: CONFIG.TEMPERATURE || 0.7,
       }),
       signal: abortController.signal,
     });
