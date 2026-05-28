@@ -17,7 +17,7 @@
   const DEFAULT_SYSTEM_PROMPT = 'You are a helpful assistant';
   // Chat template tokens
   const CHAT_START_TOKEN = '<|im_start|>';
-  const CHAT_END_TOKEN = '<|im_end|>';
+  const CHAT_END_TOKEN = '\n<|im_end|>';
 
   // ── Validate CONFIG ──────────────────────────────────────
   if (typeof CONFIG === 'undefined') {
@@ -455,8 +455,10 @@
 
     // Format prompt with chat template tokens
     const prompt = messages
-      .map(m => `${CHAT_START_TOKEN}${m.role}\n${m.content}\n${CHAT_END_TOKEN}`)
+      .map(m => `${CHAT_START_TOKEN}${m.role}\n${m.content}${CHAT_END_TOKEN}`)
       .join('\n') + `\n${CHAT_START_TOKEN}assistant\n`;
+
+    console.log(prompt)
 
     const response = await fetch(endpoint, {
       method: 'POST',
