@@ -450,6 +450,11 @@
   /**
    * Estimate token count based on character count.
    * Uses approximate ratio of 4 characters per token.
+   * 
+   * NOTE: This is a rough approximation. Actual token counts may vary
+   * depending on the language, content, and tokenizer used by the LLM.
+   * English text typically has ~4 chars/token, but other languages and
+   * code may differ significantly.
    */
   function estimateTokens(text) {
     if (!text) return 0;
