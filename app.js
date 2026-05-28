@@ -396,8 +396,8 @@
    * older messages into a summary.
    */
   function compressContext(messages) {
-    const lastNTokens = CONFIG.CONTEXT_LAST_N_TOKENS || 2000;
-    const compressToTokens = CONFIG.CONTEXT_COMPRESS_TO_TOKENS || 500;
+    const lastNTokens = CONFIG.CONTEXT_LAST_N_TOKENS ?? 2000;
+    const compressToTokens = CONFIG.CONTEXT_COMPRESS_TO_TOKENS ?? 500;
 
     // If compression is disabled (very large lastNTokens), return all messages
     if (lastNTokens >= 1000000) {
@@ -412,18 +412,28 @@
 
     // Find the split point: keep messages from the end until we exceed lastNTokens
     let recentTokenCount = 0;
-    let splitIndex = messageTokens.length;
+    let splitIndex = -1; // -1 means all messages fit
 
     for (let i = messageTokens.length - 1; i >= 0; i--) {
-      recentTokenCount += messageTokens[i].tokens;
-      if (recentTokenCount > lastNTokens) {
-        splitIndex = i + 1;
+      const nextTotal = recentTokenCount + messageTokens[i].tokens;
+      
+      // If adding this message would exceed the limit
+      if (nextTotal > lastNTokens) {
+        // Special case: if this is the last message and it alone exceeds the limit,
+        // we still need to include it (can't send nothing)
+        if (i === messageTokens.length - 1) {
+          splitIndex = i; // Keep only the last message as recent
+        } else {
+          splitIndex = i + 1; // Split here, keep i+1 onwards as recent
+        }
         break;
       }
+      
+      recentTokenCount = nextTotal;
     }
 
     // If all messages fit within the limit, return them all
-    if (splitIndex === 0) {
+    if (splitIndex === -1) {
       return messages;
     }
 
@@ -436,18 +446,24 @@
       return recentMessages;
     }
 
-    // If compression is disabled (compressToTokens is 0), discard old messages
+    // Extract system prompt from old messages if present
+    const systemPrompt = oldMessages.find(m => m.role === 'system');
+    const oldNonSystemMessages = oldMessages.filter(m => m.role !== 'system');
+
+    // If compression is disabled (compressToTokens is 0), discard old non-system messages
     if (compressToTokens === 0) {
-      // Keep system prompt if it exists
-      const systemPrompt = messages.find(m => m.role === 'system');
+      // Keep system prompt if it exists in old messages, plus all recent messages
       return systemPrompt 
-        ? [systemPrompt, ...recentMessages.filter(m => m.role !== 'system')]
+        ? [systemPrompt, ...recentMessages]
         : recentMessages;
     }
 
-    // Compress old messages into a summary
-    const systemPrompt = oldMessages.find(m => m.role === 'system');
-    const oldNonSystemMessages = oldMessages.filter(m => m.role !== 'system');
+    // If there are no old non-system messages to compress, just combine system prompt and recent
+    if (oldNonSystemMessages.length === 0) {
+      return systemPrompt 
+        ? [systemPrompt, ...recentMessages]
+        : recentMessages;
+    }
 
     // Create a compressed summary of old messages
     const summaryContent = `[Previous conversation summary - ${oldNonSystemMessages.length} messages compressed]:\n` +
@@ -467,7 +483,7 @@
     // Build final message list
     const result = [];
     
-    // Add original system prompt first if it exists
+    // Add original system prompt first if it exists in old messages
     if (systemPrompt) {
       result.push(systemPrompt);
     }
@@ -475,8 +491,8 @@
     // Add compressed summary
     result.push(compressedMessage);
     
-    // Add recent messages (excluding system prompt if it was already added)
-    result.push(...recentMessages.filter(m => m.role !== 'system' || !systemPrompt));
+    // Add all recent messages
+    result.push(...recentMessages);
 
     return result;
   }
