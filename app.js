@@ -13,6 +13,11 @@
   const INPUT_MAX_HEIGHT_FALLBACK = 200;
   // Max characters used when auto-generating a conversation title from user input
   const MAX_TITLE_LENGTH = 50;
+  // Default system prompt fallback
+  const DEFAULT_SYSTEM_PROMPT = 'You are a helpful assistant';
+  // Chat template tokens
+  const CHAT_START_TOKEN = '<|im_start|>';
+  const CHAT_END_TOKEN = '\n<|im_end|>';
 
   // ── Validate CONFIG ──────────────────────────────────────
   if (typeof CONFIG === 'undefined') {
@@ -41,6 +46,13 @@
   const appNameEl    = document.getElementById('appName');
   const mobileTitleEl= document.getElementById('mobileTitle');
   const welcomeHeadingEl = document.getElementById('welcomeHeading');
+  const settingsToggle = document.getElementById('settingsToggle');
+  const settingsPanel = document.getElementById('settingsPanel');
+  const systemPromptInput = document.getElementById('systemPrompt');
+  const maxTokensInput = document.getElementById('maxTokens');
+  const maxTokensValue = document.getElementById('maxTokensValue');
+  const temperatureInput = document.getElementById('temperature');
+  const temperatureValue = document.getElementById('temperatureValue');
 
   // ── Apply app name from config ────────────────────────────
   const appName = (CONFIG.APP_NAME || 'Budget AI').trim();
@@ -62,6 +74,56 @@
     const current = document.documentElement.getAttribute('data-theme') || 'light';
     applyTheme(current === 'dark' ? 'light' : 'dark');
   });
+
+  // ── Settings panel ────────────────────────────────────────
+  // Initialize settings from CONFIG
+  if (systemPromptInput) {
+    systemPromptInput.value = CONFIG.SYSTEM_PROMPT || '';
+    systemPromptInput.placeholder = CONFIG.SYSTEM_PROMPT || DEFAULT_SYSTEM_PROMPT;
+  }
+  if (maxTokensInput) {
+    maxTokensInput.value = CONFIG.MAX_TOKENS || 512;
+    maxTokensValue.textContent = CONFIG.MAX_TOKENS || 512;
+  }
+  if (temperatureInput) {
+    temperatureInput.value = CONFIG.TEMPERATURE || 0.7;
+    temperatureValue.textContent = CONFIG.TEMPERATURE || 0.7;
+  }
+
+  // Settings toggle
+  if (settingsToggle) {
+    settingsToggle.addEventListener('click', () => {
+      const isHidden = settingsPanel.hasAttribute('hidden');
+      if (isHidden) {
+        settingsPanel.removeAttribute('hidden');
+      } else {
+        settingsPanel.setAttribute('hidden', '');
+      }
+    });
+  }
+
+  // Update CONFIG when settings change
+  if (systemPromptInput) {
+    systemPromptInput.addEventListener('input', () => {
+      CONFIG.SYSTEM_PROMPT = systemPromptInput.value;
+    });
+  }
+
+  if (maxTokensInput) {
+    maxTokensInput.addEventListener('input', () => {
+      const value = parseInt(maxTokensInput.value);
+      maxTokensValue.textContent = value;
+      CONFIG.MAX_TOKENS = value;
+    });
+  }
+
+  if (temperatureInput) {
+    temperatureInput.addEventListener('input', () => {
+      const value = parseFloat(temperatureInput.value);
+      temperatureValue.textContent = value.toFixed(1);
+      CONFIG.TEMPERATURE = value;
+    });
+  }
 
   // ── Sidebar toggle (mobile) ───────────────────────────────
   if (sidebarToggle) {
@@ -391,17 +453,20 @@
       headers['Authorization'] = `Bearer ${CONFIG.API_KEY}`;
     }
 
+    // Format prompt with chat template tokens
     const prompt = messages
-      .map(m => `${m.role}: ${m.content}`)
-      .join('\n');
+      .map(m => `${CHAT_START_TOKEN}${m.role}\n${m.content}${CHAT_END_TOKEN}`)
+      .join('\n') + `\n${CHAT_START_TOKEN}assistant\n`;
+
+    console.log(prompt)
 
     const response = await fetch(endpoint, {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        model: CONFIG.MODEL,
         prompt,
-        stream: true,
+        max_tokens: CONFIG.MAX_TOKENS || 512,
+        temperature: CONFIG.TEMPERATURE || 0.7,
       }),
       signal: abortController.signal,
     });
@@ -427,11 +492,13 @@
     let buffer = '';
     let fullText = '';
     let firstToken = true;
+    // Flag to exit both loops when backend signals completion via stop field
+    let streamComplete = false;
 
     while (true) {
       const { done, value } = await reader.read();
 
-      if (done) break;
+      if (done || streamComplete) break;
 
       buffer += decoder.decode(value, { stream: true });
 
@@ -444,15 +511,22 @@
 
         if (!trimmed) continue;
 
+        // Handle Server-Sent Events format (lines starting with "data: ")
+        let jsonStr = trimmed;
+        if (trimmed.startsWith('data: ')) {
+          jsonStr = trimmed.substring(6);
+        }
+
         let parsed;
 
         try {
-          parsed = JSON.parse(trimmed);
+          parsed = JSON.parse(jsonStr);
         } catch {
           continue;
         }
 
-        const delta = parsed?.response;
+        // Extract content from the new streaming format
+        const delta = parsed?.content;
 
         if (!delta) continue;
 
@@ -466,6 +540,13 @@
         bubble.textContent = fullText;
 
         scrollToBottom();
+
+        // Check if streaming is complete - need to exit both loops
+        // (inner loop processes lines, outer loop reads chunks)
+        if (parsed?.stop === true) {
+          streamComplete = true;
+          break;
+        }
       }
     }
 
