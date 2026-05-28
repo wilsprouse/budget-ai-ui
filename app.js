@@ -379,6 +379,108 @@
     }
   }
 
+  // ── Context Management ───────────────────────────────────
+  /**
+   * Estimate token count for text.
+   * Rough approximation: 1 token ≈ 4 characters for English text.
+   * This is a simple heuristic; actual tokenization varies by model.
+   */
+  function estimateTokens(text) {
+    if (!text) return 0;
+    return Math.ceil(text.length / 4);
+  }
+
+  /**
+   * Compress context to fit within token limits.
+   * Keeps the last N tokens of recent conversation and compresses
+   * older messages into a summary.
+   */
+  function compressContext(messages) {
+    const lastNTokens = CONFIG.CONTEXT_LAST_N_TOKENS || 2000;
+    const compressToTokens = CONFIG.CONTEXT_COMPRESS_TO_TOKENS || 500;
+
+    // If compression is disabled (very large lastNTokens), return all messages
+    if (lastNTokens >= 1000000) {
+      return messages;
+    }
+
+    // Calculate token count for each message
+    const messageTokens = messages.map(msg => ({
+      message: msg,
+      tokens: estimateTokens(`${msg.role}: ${msg.content}`)
+    }));
+
+    // Find the split point: keep messages from the end until we exceed lastNTokens
+    let recentTokenCount = 0;
+    let splitIndex = messageTokens.length;
+
+    for (let i = messageTokens.length - 1; i >= 0; i--) {
+      recentTokenCount += messageTokens[i].tokens;
+      if (recentTokenCount > lastNTokens) {
+        splitIndex = i + 1;
+        break;
+      }
+    }
+
+    // If all messages fit within the limit, return them all
+    if (splitIndex === 0) {
+      return messages;
+    }
+
+    // Split into old and recent messages
+    const oldMessages = messages.slice(0, splitIndex);
+    const recentMessages = messages.slice(splitIndex);
+
+    // If there are no old messages, just return recent ones
+    if (oldMessages.length === 0) {
+      return recentMessages;
+    }
+
+    // If compression is disabled (compressToTokens is 0), discard old messages
+    if (compressToTokens === 0) {
+      // Keep system prompt if it exists
+      const systemPrompt = messages.find(m => m.role === 'system');
+      return systemPrompt 
+        ? [systemPrompt, ...recentMessages.filter(m => m.role !== 'system')]
+        : recentMessages;
+    }
+
+    // Compress old messages into a summary
+    const systemPrompt = oldMessages.find(m => m.role === 'system');
+    const oldNonSystemMessages = oldMessages.filter(m => m.role !== 'system');
+
+    // Create a compressed summary of old messages
+    const summaryContent = `[Previous conversation summary - ${oldNonSystemMessages.length} messages compressed]:\n` +
+      oldNonSystemMessages.map(m => `${m.role}: ${m.content.slice(0, 100)}${m.content.length > 100 ? '...' : ''}`).join('\n');
+
+    // Trim summary to approximate token limit
+    const targetLength = compressToTokens * 4; // Convert tokens to characters
+    const trimmedSummary = summaryContent.length > targetLength 
+      ? summaryContent.slice(0, targetLength) + '...'
+      : summaryContent;
+
+    const compressedMessage = {
+      role: 'system',
+      content: trimmedSummary
+    };
+
+    // Build final message list
+    const result = [];
+    
+    // Add original system prompt first if it exists
+    if (systemPrompt) {
+      result.push(systemPrompt);
+    }
+    
+    // Add compressed summary
+    result.push(compressedMessage);
+    
+    // Add recent messages (excluding system prompt if it was already added)
+    result.push(...recentMessages.filter(m => m.role !== 'system' || !systemPrompt));
+
+    return result;
+  }
+
   // ── Streaming fetch ───────────────────────────────────────
   async function streamResponse(messages, bubble) {
     abortController = new AbortController();
@@ -391,7 +493,7 @@
       headers['Authorization'] = `Bearer ${CONFIG.API_KEY}`;
     }
 
-    const prompt = messages
+    const prompt = compressContext(messages)
       .map(m => `${m.role}: ${m.content}`)
       .join('\n');
 

@@ -32,4 +32,17 @@ const CONFIG = {
 
   // Name displayed in the browser tab and chat header.
   APP_NAME: 'Budget AI',
+
+  // ── Context Management ──────────────────────────────────────
+  // Maximum number of recent tokens to keep in full context.
+  // The last N tokens of the conversation history will be sent
+  // to the LLM without compression.
+  // Set to 0 to compress all context, or a large number to disable compression.
+  CONTEXT_LAST_N_TOKENS: 2000,
+
+  // Maximum number of tokens to compress older context into.
+  // All messages before the last N tokens will be summarized
+  // into a compressed summary of approximately this token count.
+  // Set to 0 to discard older context entirely.
+  CONTEXT_COMPRESS_TO_TOKENS: 500,
 };
