@@ -566,12 +566,15 @@
     const targetChars = targetTokens * CHARS_PER_TOKEN;
     const truncated = summary.slice(0, targetChars);
     
+    // Helper to check if boundary index is valid (at least MIN_TRUNCATION_RATIO of target)
+    const isValidBoundary = (index) => index !== -1 && index >= targetChars * MIN_TRUNCATION_RATIO;
+    
     // Try to end at a sentence or word boundary
     let endIndex = truncated.lastIndexOf('.');
-    if (endIndex === -1 || endIndex < targetChars * MIN_TRUNCATION_RATIO) {
+    if (!isValidBoundary(endIndex)) {
       endIndex = truncated.lastIndexOf(' ');
     }
-    if (endIndex === -1 || endIndex < targetChars * MIN_TRUNCATION_RATIO) {
+    if (!isValidBoundary(endIndex)) {
       endIndex = truncated.length;
     }
 
