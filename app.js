@@ -20,6 +20,8 @@
   const CHAT_END_TOKEN = '\n<|im_end|>';
   // Approximate characters per token for token estimation
   const CHARS_PER_TOKEN = 4;
+  // Minimum ratio of target length to use before falling back to next boundary type
+  const MIN_TRUNCATION_RATIO = 0.8;
 
   // ── Validate CONFIG ──────────────────────────────────────
   if (typeof CONFIG === 'undefined') {
@@ -450,6 +452,7 @@
    * Uses approximate ratio of 4 characters per token.
    */
   function estimateTokens(text) {
+    if (!text) return 0;
     return Math.ceil(text.length / CHARS_PER_TOKEN);
   }
 
@@ -483,7 +486,7 @@
 
     // Find the split point: keep recent messages that fit in contextLastN
     let recentTokens = 0;
-    let splitIndex = messages.length;
+    let splitIndex = 0;
     
     for (let i = messages.length - 1; i >= 0; i--) {
       recentTokens += messageTokens[i];
@@ -498,8 +501,8 @@
       splitIndex = 1;
     }
 
-    // No old messages to compress
-    if (splitIndex >= messages.length) {
+    // No old messages to compress (all messages fit in recent context)
+    if (splitIndex === 0) {
       return messages;
     }
 
@@ -507,8 +510,13 @@
     const oldMessages = messages.slice(0, splitIndex);
     const recentMessages = messages.slice(splitIndex);
 
+    // Prepare messages to compress (exclude system prompt if present)
+    const messagesToCompress = oldMessages[0]?.role === 'system' 
+      ? oldMessages.slice(1) 
+      : oldMessages;
+
     // Create compressed summary of old messages
-    const compressedSummary = createCompressedSummary(oldMessages, compressTo);
+    const compressedSummary = createCompressedSummary(messagesToCompress, compressTo);
 
     // Combine: system prompt (if exists) + compressed summary + recent messages
     const result = [];
@@ -516,14 +524,10 @@
     // Keep system prompt if it exists
     if (messages[0]?.role === 'system') {
       result.push(messages[0]);
-      // Remove system prompt from old messages if we're compressing them
-      if (oldMessages[0]?.role === 'system') {
-        oldMessages.shift();
-      }
     }
 
     // Add compressed summary if we have old messages to compress
-    if (oldMessages.length > 0) {
+    if (messagesToCompress.length > 0) {
       result.push({
         role: 'system',
         content: compressedSummary
@@ -564,10 +568,10 @@
     
     // Try to end at a sentence or word boundary
     let endIndex = truncated.lastIndexOf('.');
-    if (endIndex === -1 || endIndex < targetChars * 0.8) {
+    if (endIndex === -1 || endIndex < targetChars * MIN_TRUNCATION_RATIO) {
       endIndex = truncated.lastIndexOf(' ');
     }
-    if (endIndex === -1 || endIndex < targetChars * 0.8) {
+    if (endIndex === -1 || endIndex < targetChars * MIN_TRUNCATION_RATIO) {
       endIndex = truncated.length;
     }
 
