@@ -380,6 +380,11 @@
   }
 
   // ── Context Management ───────────────────────────────────
+  
+  // Constants for token estimation and compression
+  const CHARS_PER_TOKEN = 4; // Approximate: 1 token ≈ 4 characters for English
+  const COMPRESSION_DISABLED_THRESHOLD = 1000000; // Very large value to disable compression
+  
   /**
    * Estimate token count for text.
    * Rough approximation: 1 token ≈ 4 characters for English text.
@@ -387,7 +392,7 @@
    */
   function estimateTokens(text) {
     if (!text) return 0;
-    return Math.ceil(text.length / 4);
+    return Math.ceil(text.length / CHARS_PER_TOKEN);
   }
 
   /**
@@ -400,7 +405,7 @@
     const compressToTokens = CONFIG.CONTEXT_COMPRESS_TO_TOKENS ?? 500;
 
     // If compression is disabled (very large lastNTokens), return all messages
-    if (lastNTokens >= 1000000) {
+    if (lastNTokens >= COMPRESSION_DISABLED_THRESHOLD) {
       return messages;
     }
 
@@ -470,7 +475,7 @@
       oldNonSystemMessages.map(m => `${m.role}: ${m.content.slice(0, 100)}${m.content.length > 100 ? '...' : ''}`).join('\n');
 
     // Trim summary to approximate token limit
-    const targetLength = compressToTokens * 4; // Convert tokens to characters
+    const targetLength = compressToTokens * CHARS_PER_TOKEN; // Convert tokens to characters
     const trimmedSummary = summaryContent.length > targetLength 
       ? summaryContent.slice(0, targetLength) + '...'
       : summaryContent;
