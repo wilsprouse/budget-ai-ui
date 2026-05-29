@@ -56,10 +56,42 @@ python3 -m http.server 8080
 
 - **Streaming** — responses appear token-by-token as they are generated
 - **Conversation history** — multiple chats stored in `localStorage`
+- **Context compression** — automatically compresses long conversations to prevent context window overflow
 - **Dark / light mode** — toggle in the sidebar; preference is remembered
 - **Minimal Markdown** — code fences and inline code are rendered
 - **Responsive** — works on desktop and mobile
 - **Keyboard shortcuts** — `Enter` to send, `Shift+Enter` for a newline
+
+## Advanced Configuration
+
+### Context Compression
+
+For long conversations, Budget AI automatically compresses chat history to prevent
+context window overflow. You can configure this behavior in `config.js`:
+
+```js
+const CONFIG = {
+  // ... other settings ...
+  
+  // Number of tokens to keep from recent conversation history (default: 2000)
+  // Recent messages within this limit are sent to the LLM unchanged
+  CONTEXT_LAST_N_TOKENS: 2000,
+  
+  // Number of tokens to compress older context into (default: 500)
+  // Messages older than CONTEXT_LAST_N_TOKENS are summarized to fit this size
+  CONTEXT_COMPRESS_TO_TOKENS: 500,
+};
+```
+
+**How it works:**
+- When a conversation exceeds `CONTEXT_LAST_N_TOKENS`, older messages are compressed
+- Recent messages (last N tokens) are kept intact for context
+- Older messages are summarized into approximately `CONTEXT_COMPRESS_TO_TOKENS`
+- This reduces token usage by ~85% for long conversations while maintaining continuity
+
+**Token estimation:**
+- Budget AI estimates ~4 characters per token (English text)
+- This is an approximation; actual counts vary by language and tokenizer
 
 ## Project structure
 

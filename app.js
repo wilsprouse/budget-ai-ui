@@ -18,6 +18,10 @@
   // Chat template tokens
   const CHAT_START_TOKEN = '<|im_start|>';
   const CHAT_END_TOKEN = '\n<|im_end|>';
+  // Approximate characters per token for token estimation
+  const CHARS_PER_TOKEN = 4;
+  // Minimum ratio of target length to use before falling back to next boundary type
+  const MIN_TRUNCATION_RATIO = 0.8;
 
   // ── Validate CONFIG ──────────────────────────────────────
   if (typeof CONFIG === 'undefined') {
@@ -442,6 +446,146 @@
   }
 
   // ── Streaming fetch ───────────────────────────────────────
+  
+  /**
+   * Estimate token count based on character count.
+   * Uses approximate ratio of 4 characters per token.
+   * 
+   * NOTE: This is a rough approximation. Actual token counts may vary
+   * depending on the language, content, and tokenizer used by the LLM.
+   * English text typically has ~4 chars/token, but other languages and
+   * code may differ significantly.
+   */
+  function estimateTokens(text) {
+    if (!text) return 0;
+    return Math.ceil(text.length / CHARS_PER_TOKEN);
+  }
+
+  /**
+   * Compress conversation context to fit within token limits.
+   * Keeps the last N tokens intact and compresses older messages
+   * into a summary that fits the compression target.
+   * 
+   * @param {Array} messages - Array of message objects {role, content}
+   * @returns {Array} - Compressed array of messages
+   */
+  function compressContext(messages) {
+    if (!messages || messages.length === 0) return messages;
+
+    // Get configuration values with defaults
+    const contextLastN = CONFIG.CONTEXT_LAST_N_TOKENS || 2000;
+    const compressTo = CONFIG.CONTEXT_COMPRESS_TO_TOKENS || 500;
+
+    // Calculate total tokens in conversation
+    let totalTokens = 0;
+    const messageTokens = messages.map(msg => {
+      const tokens = estimateTokens(msg.content);
+      totalTokens += tokens;
+      return tokens;
+    });
+
+    // If total is within limit, no compression needed
+    if (totalTokens <= contextLastN) {
+      return messages;
+    }
+
+    // Find the split point: keep recent messages that fit in contextLastN
+    let recentTokens = 0;
+    let splitIndex = 0;
+    
+    for (let i = messages.length - 1; i >= 0; i--) {
+      recentTokens += messageTokens[i];
+      if (recentTokens > contextLastN) {
+        splitIndex = i + 1;
+        break;
+      }
+    }
+
+    // If split index is 0, keep at least the system prompt if present
+    if (splitIndex === 0 && messages[0]?.role === 'system') {
+      splitIndex = 1;
+    }
+
+    // No old messages to compress (all messages fit in recent context)
+    if (splitIndex === 0) {
+      return messages;
+    }
+
+    // Split messages into old (to compress) and recent (to keep)
+    const oldMessages = messages.slice(0, splitIndex);
+    const recentMessages = messages.slice(splitIndex);
+
+    // Prepare messages to compress (exclude system prompt if present)
+    const messagesToCompress = oldMessages[0]?.role === 'system' 
+      ? oldMessages.slice(1) 
+      : oldMessages;
+
+    // Create compressed summary of old messages
+    const compressedSummary = createCompressedSummary(messagesToCompress, compressTo);
+
+    // Combine: system prompt (if exists) + compressed summary + recent messages
+    const result = [];
+    
+    // Keep system prompt if it exists
+    if (messages[0]?.role === 'system') {
+      result.push(messages[0]);
+    }
+
+    // Add compressed summary if we have old messages to compress
+    if (messagesToCompress.length > 0) {
+      result.push({
+        role: 'system',
+        content: compressedSummary
+      });
+    }
+
+    // Add recent messages
+    result.push(...recentMessages);
+
+    return result;
+  }
+
+  /**
+   * Create a compressed summary of messages that fits within token limit.
+   * 
+   * @param {Array} messages - Messages to compress
+   * @param {number} targetTokens - Target token count for summary
+   * @returns {string} - Compressed summary
+   */
+  function createCompressedSummary(messages, targetTokens) {
+    if (!messages || messages.length === 0) return '';
+
+    // Build a simple summary of the conversation
+    const summary = messages
+      .filter(m => m.role !== 'system') // Skip system prompts in summary
+      .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
+      .join('\n');
+
+    // If summary is already within target, return it
+    const summaryTokens = estimateTokens(summary);
+    if (summaryTokens <= targetTokens) {
+      return `[Earlier conversation context]\n${summary}`;
+    }
+
+    // Truncate to fit target tokens (approximate)
+    const targetChars = targetTokens * CHARS_PER_TOKEN;
+    const truncated = summary.slice(0, targetChars);
+    
+    // Helper to check if boundary index is valid (at least MIN_TRUNCATION_RATIO of target)
+    const isValidBoundary = (index) => index !== -1 && index >= targetChars * MIN_TRUNCATION_RATIO;
+    
+    // Try to end at a sentence or word boundary
+    let endIndex = truncated.lastIndexOf('.');
+    if (!isValidBoundary(endIndex)) {
+      endIndex = truncated.lastIndexOf(' ');
+    }
+    if (!isValidBoundary(endIndex)) {
+      endIndex = truncated.length;
+    }
+
+    return `[Earlier conversation context (compressed)]\n${truncated.slice(0, endIndex)}...`;
+  }
+
   async function streamResponse(messages, bubble) {
     abortController = new AbortController();
 
@@ -453,8 +597,11 @@
       headers['Authorization'] = `Bearer ${CONFIG.API_KEY}`;
     }
 
+    // Apply context compression to prevent sending entire chat history
+    const compressedMessages = compressContext(messages);
+
     // Format prompt with chat template tokens
-    const prompt = messages
+    const prompt = compressedMessages
       .map(m => `${CHAT_START_TOKEN}${m.role}\n${m.content}${CHAT_END_TOKEN}`)
       .join('\n') + `\n${CHAT_START_TOKEN}assistant\n`;
 
