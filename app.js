@@ -15,6 +15,10 @@
   const MAX_TITLE_LENGTH = 50;
   // Default system prompt fallback
   const DEFAULT_SYSTEM_PROMPT = 'You are a helpful assistant';
+  // Default API path for OpenAI-compatible endpoints
+  const DEFAULT_API_PATH = '/v1/chat/completions';
+  // Default model name fallback
+  const DEFAULT_MODEL = 'gpt-3.5-turbo';
   // Approximate characters per token for token estimation
   const CHARS_PER_TOKEN = 4;
   // Minimum ratio of target length to use before falling back to next boundary type
@@ -588,7 +592,7 @@
 
     // Build endpoint using LLM_API_PATH from config
     const baseUrl = (CONFIG.LLM_BASE_URL || '').replace(/\/$/, '');
-    const apiPath = (CONFIG.LLM_API_PATH || '/v1/chat/completions').replace(/^\//, '');
+    const apiPath = (CONFIG.LLM_API_PATH || DEFAULT_API_PATH).replace(/^\//, '');
     const endpoint = `${baseUrl}/${apiPath}`;
 
     const headers = { 'Content-Type': 'application/json' };
@@ -604,7 +608,7 @@
       method: 'POST',
       headers,
       body: JSON.stringify({
-        model: CONFIG.MODEL || 'gpt-3.5-turbo',
+        model: CONFIG.MODEL || DEFAULT_MODEL,
         messages: compressedMessages,
         max_tokens: CONFIG.MAX_TOKENS || 512,
         temperature: CONFIG.TEMPERATURE || 0.7,
