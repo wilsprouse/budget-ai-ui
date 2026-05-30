@@ -587,12 +587,33 @@
     return `[Earlier conversation context (compressed)]\n${truncated.slice(0, endIndex)}...`;
   }
 
+  /**
+   * Extract delta content from streaming response chunk.
+   * Supports both OpenAI format and fallback custom format.
+   * 
+   * @param {Object} parsed - Parsed JSON chunk from streaming response
+   * @returns {string|null} - Delta content text, or null if not found
+   */
+  function extractDeltaContent(parsed) {
+    // OpenAI format: { choices: [{ delta: { content: "..." } }] }
+    if (parsed?.choices?.[0]?.delta?.content) {
+      return parsed.choices[0].delta.content;
+    }
+    
+    // Fallback custom format: { content: "...", stop: true/false }
+    if (parsed?.content) {
+      return parsed.content;
+    }
+    
+    return null;
+  }
+
   async function streamResponse(messages, bubble) {
     abortController = new AbortController();
 
     // Build endpoint using LLM_API_PATH from config
     const baseUrl = (CONFIG.LLM_BASE_URL || '').replace(/\/$/, '');
-    const apiPath = (CONFIG.LLM_API_PATH || DEFAULT_API_PATH).replace(/^\//, '');
+    const apiPath = (CONFIG.LLM_API_PATH || DEFAULT_API_PATH).replace(/^\/+/, '');
     const endpoint = `${baseUrl}/${apiPath}`;
 
     const headers = { 'Content-Type': 'application/json' };
@@ -665,10 +686,8 @@
           continue;
         }
 
-        // Extract content from OpenAI format or fallback format
-        // OpenAI format: { choices: [{ delta: { content: "..." } }] }
-        // Fallback format: { content: "...", stop: true/false }
-        const delta = parsed?.choices?.[0]?.delta?.content || parsed?.content;
+        // Extract content from streaming response
+        const delta = extractDeltaContent(parsed);
 
         if (!delta) continue;
 
