@@ -15,9 +15,6 @@
   const MAX_TITLE_LENGTH = 50;
   // Default system prompt fallback
   const DEFAULT_SYSTEM_PROMPT = 'You are a helpful assistant';
-  // Chat template tokens
-  const CHAT_START_TOKEN = '<|im_start|>';
-  const CHAT_END_TOKEN = '\n<|im_end|>';
   // Approximate characters per token for token estimation
   const CHARS_PER_TOKEN = 4;
   // Minimum ratio of target length to use before falling back to next boundary type
@@ -589,8 +586,10 @@
   async function streamResponse(messages, bubble) {
     abortController = new AbortController();
 
-    //const endpoint = `${(CONFIG.LLM_BASE_URL || '').replace(/\/$/, '')}${CONFIG.LLM_API_PATH || '/generate'}`;
-    const endpoint = `${CONFIG.LLM_BASE_URL}/generate`;
+    // Build endpoint using LLM_API_PATH from config
+    const baseUrl = (CONFIG.LLM_BASE_URL || '').replace(/\/$/, '');
+    const apiPath = (CONFIG.LLM_API_PATH || '/v1/chat/completions').replace(/^\//, '');
+    const endpoint = `${baseUrl}/${apiPath}`;
 
     const headers = { 'Content-Type': 'application/json' };
     if (CONFIG.API_KEY) {
@@ -600,34 +599,19 @@
     // Apply context compression to prevent sending entire chat history
     const compressedMessages = compressContext(messages);
 
-    // Format prompt with chat template tokens
-    const prompt = compressedMessages
-      .map(m => `${CHAT_START_TOKEN}${m.role}\n${m.content}${CHAT_END_TOKEN}`)
-      .join('\n') + `\n${CHAT_START_TOKEN}assistant\n`;
-
-    console.log(prompt)
-
+    // Use OpenAI-compatible format
     const response = await fetch(endpoint, {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        prompt,
+        model: CONFIG.MODEL || 'gpt-3.5-turbo',
+        messages: compressedMessages,
         max_tokens: CONFIG.MAX_TOKENS || 512,
         temperature: CONFIG.TEMPERATURE || 0.7,
+        stream: true,
       }),
       signal: abortController.signal,
     });
-
-    /*const response = await fetch(endpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        prompt: messages[messages.length - 1].content,
-        stream: true
-      }),
-      signal: abortController.signal,
-    });*/
-
 
     if (!response.ok) {
       const body = await response.text().catch(() => '');
@@ -662,6 +646,11 @@
         let jsonStr = trimmed;
         if (trimmed.startsWith('data: ')) {
           jsonStr = trimmed.substring(6);
+          // OpenAI format uses "data: [DONE]" to signal completion
+          if (jsonStr === '[DONE]') {
+            streamComplete = true;
+            break;
+          }
         }
 
         let parsed;
@@ -672,8 +661,10 @@
           continue;
         }
 
-        // Extract content from the new streaming format
-        const delta = parsed?.content;
+        // Extract content from OpenAI format or fallback format
+        // OpenAI format: { choices: [{ delta: { content: "..." } }] }
+        // Fallback format: { content: "...", stop: true/false }
+        const delta = parsed?.choices?.[0]?.delta?.content || parsed?.content;
 
         if (!delta) continue;
 
@@ -688,9 +679,10 @@
 
         scrollToBottom();
 
-        // Check if streaming is complete - need to exit both loops
-        // (inner loop processes lines, outer loop reads chunks)
-        if (parsed?.stop === true) {
+        // Check if streaming is complete
+        // OpenAI uses "data: [DONE]" (handled above)
+        // Fallback format uses stop field
+        if (parsed?.stop === true || parsed?.choices?.[0]?.finish_reason) {
           streamComplete = true;
           break;
         }
