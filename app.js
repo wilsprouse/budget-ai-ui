@@ -741,3 +741,4 @@
   renderMessages();
   userInput.focus();
 })();
+
